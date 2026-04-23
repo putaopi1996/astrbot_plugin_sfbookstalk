@@ -37,7 +37,10 @@ class SFBooksTalkPlugin(Star):
                 f"plugin={_describe_config_shape(self._plugin_config)}; "
                 f"global={_describe_config_shape(raw_global_config)}"
             )
-            config = MonitorConfig.from_sources(self._plugin_config, raw_global_config)
+            source_config = self._plugin_config
+            if not _looks_like_plugin_config(source_config):
+                source_config = raw_global_config
+            config = MonitorConfig.from_mapping(source_config)
             client = SfNovelClient(config.novel_url, config.request_timeout_seconds)
             commenter = CommentGenerator(self.context, config)
             sender = OneBotSender(self.context, config)
@@ -88,3 +91,25 @@ def _describe_config_shape(raw_config: Any) -> str:
     if keys:
         return f"{type(raw_config).__name__}(attrs={keys})"
     return type(raw_config).__name__
+
+
+def _looks_like_plugin_config(raw_config: Any) -> bool:
+    if isinstance(raw_config, Mapping):
+        keys = raw_config.keys()
+    else:
+        keys = getattr(raw_config, "__dict__", {}).keys()
+    return any(
+        key in keys
+        for key in (
+            "novel_url",
+            "check_interval_minutes",
+            "group_ids",
+            "private_user_ids",
+            "notify_on_first_run",
+            "preview_max_chars",
+            "request_timeout_seconds",
+            "enable_llm_comment",
+            "comment_prompt",
+            "comment_fallback_text",
+        )
+    )
