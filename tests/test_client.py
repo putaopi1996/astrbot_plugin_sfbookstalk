@@ -47,6 +47,20 @@ NOISY_CHAPTER_HTML = """
 </html>
 """
 
+CHAPTER_BODY_HTML = """
+<html>
+  <body>
+    <div>都市怪谈症候群 第十五章 职业技术学院新来了个年轻人（中） 作者：飞鸟印 更新时间：2026/4/23 20:55:12 字数：2132</div>
+    <h1>第1章</h1>
+    <div>更新时间：2026-04-24 10:00:00</div>
+    <div>字数：1234</div>
+    <div class="article-content font16" id="ChapterBody" data-class="font16">
+      若说这个梦与之前的梦最大的不同在哪，莫过于每个人物都有面容吧。列车突然停了下来。
+    </div>
+  </body>
+</html>
+"""
+
 
 def _response(url: str, status_code: int, text: str) -> httpx.Response:
     return httpx.Response(status_code, request=httpx.Request("GET", url), text=text)
@@ -120,3 +134,11 @@ def test_parse_chapter_page_skips_navigation_noise():
     chapter = parser.parse_chapter_page(NOISY_CHAPTER_HTML, CHAPTER_URL)
 
     assert chapter.preview == "这是正确的章节预览内容，不应该被顶部导航覆盖。"
+
+
+def test_parse_chapter_page_prefers_chapter_body_container():
+    parser = SfNovelParser(NOVEL_URL)
+
+    chapter = parser.parse_chapter_page(CHAPTER_BODY_HTML, CHAPTER_URL)
+
+    assert chapter.preview == "若说这个梦与之前的梦最大的不同在哪，莫过于每个人物都有面容吧。列车突然停了下来。"

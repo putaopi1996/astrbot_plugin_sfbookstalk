@@ -60,7 +60,7 @@ class SfNovelParser:
         title = _clean(title_node.get_text(" ", strip=True) if title_node else "")
         update_time = _match_text(page_text, r"更新时间[:：]\s*([0-9/\-:\s]+)")
         word_text = _match_text(page_text, r"字数[:：]\s*([0-9,，]+)")
-        preview = _first_paragraph(soup)
+        preview = _extract_preview(soup)
         if not title or not update_time or not word_text:
             raise SfParseError("无法解析章节页的标题、更新时间或字数")
         return ChapterDetail(
@@ -166,6 +166,17 @@ def _first_paragraph(soup: BeautifulSoup) -> str:
         if _looks_like_preview_text(text):
             return text
     return ""
+
+
+def _extract_preview(soup: BeautifulSoup) -> str:
+    for selector in ("#ChapterBody", "div#ChapterBody", ".article-content.font16", ".article-content"):
+        node = soup.select_one(selector)
+        if node is None:
+            continue
+        text = _clean(node.get_text(" ", strip=True))
+        if _looks_like_preview_text(text):
+            return text
+    return _first_paragraph(soup)
 
 
 def _looks_like_preview_text(text: str) -> bool:
