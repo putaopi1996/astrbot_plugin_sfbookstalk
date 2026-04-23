@@ -20,6 +20,8 @@ class SfNovelParser:
         title = _clean(title_node.get_text(" ", strip=True) if title_node else "")
         title = title.replace("SF轻小说 -", "").replace("- SF轻小说", "").strip()
         author = _match_text(page_text, r"作者[:：]\s*([^\n]+)")
+        if not author:
+            author = self._extract_author_from_title(soup)
         link = self._find_latest_link(soup)
         if not title or not author or link is None:
             raise SfParseError("无法解析小说主页的标题、作者或最新章节链接")
@@ -51,6 +53,10 @@ class SfNovelParser:
 
     def _find_latest_link(self, soup: BeautifulSoup):
         for link in soup.find_all("a", href=True):
+            href = link.get("href", "")
+            if re.search(r"/vip/c/\d+/?", href):
+                return link
+        for link in soup.find_all("a", href=True):
             text = link.get_text(" ", strip=True)
             if "最新章节" in text:
                 return link
@@ -59,6 +65,12 @@ class SfNovelParser:
             if re.search(r"/Novel/\d+/\d+/\d+/?", href):
                 return link
         return None
+
+    def _extract_author_from_title(self, soup: BeautifulSoup) -> str:
+        title_tag = soup.find("title")
+        title_text = _clean(title_tag.get_text(" ", strip=True) if title_tag else "")
+        match = re.search(r"-\s*([^-\n]+?)\s*-\s*SF轻小说$", title_text)
+        return _clean(match.group(1)) if match else ""
 
 
 class SfNovelClient:
