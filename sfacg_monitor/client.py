@@ -17,6 +17,16 @@ _DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; SFBooksTalk/1.0; +https://github.com/putaopi1996/astrbot_plugin_sfbookstalk)",
     "Accept-Language": "zh-CN,zh;q=0.9",
 }
+_PREVIEW_NOISE_KEYWORDS = (
+    "首页",
+    "书库",
+    "排行榜",
+    "APP下载",
+    "VIP充值",
+    "作者福利",
+    "在线漫画",
+    "载入中",
+)
 
 
 class SfNovelParser:
@@ -28,7 +38,7 @@ class SfNovelParser:
         page_text = soup.get_text("\n", strip=True)
         title_node = soup.find("h1") or soup.find("title")
         title = _clean(title_node.get_text(" ", strip=True) if title_node else "")
-        title = title.replace("SF轻小说 -", "").replace("- SF轻小说", "").strip()
+        title = title.replace("SF轻小说-", "").replace("- SF轻小说", "").strip()
         author = _match_text(page_text, r"作者[:：]\s*([^\n]+)")
         if not author:
             author = self._extract_author_from_title(soup)
@@ -79,7 +89,7 @@ class SfNovelParser:
     def _extract_author_from_title(self, soup: BeautifulSoup) -> str:
         title_tag = soup.find("title")
         title_text = _clean(title_tag.get_text(" ", strip=True) if title_tag else "")
-        match = re.search(r"-\s*([^-\n]+?)\s*-\s*SF轻小说$", title_text)
+        match = re.search(r"-\s*([^-\n]+?)\s*-\s*SF轻小说", title_text)
         return _clean(match.group(1)) if match else ""
 
 
@@ -147,8 +157,20 @@ def _match_text(text: str, pattern: str) -> str:
 
 
 def _first_paragraph(soup: BeautifulSoup) -> str:
-    for node in soup.find_all(["p", "div"]):
+    for node in soup.find_all("p"):
         text = _clean(node.get_text(" ", strip=True))
-        if len(text) >= 10 and not text.startswith(("更新时间", "字数")):
+        if _looks_like_preview_text(text):
+            return text
+    for node in soup.find_all("div"):
+        text = _clean(node.get_text(" ", strip=True))
+        if _looks_like_preview_text(text):
             return text
     return ""
+
+
+def _looks_like_preview_text(text: str) -> bool:
+    if len(text) < 10:
+        return False
+    if text.startswith(("更新时间", "字数")):
+        return False
+    return not any(keyword in text for keyword in _PREVIEW_NOISE_KEYWORDS)

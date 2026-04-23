@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import inspect
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 
 try:
     from .compat import logger
@@ -53,25 +52,34 @@ class CommentGenerator:
 
     async def _llm_generate(self, prompt: str):
         llm_generate = self.context.llm_generate
-        try:
-            signature = inspect.signature(llm_generate)
-        except (TypeError, ValueError):
-            signature = None
+        provider_id = self._maybe_resolve_chat_provider_id()
 
-        if signature and "chat_provider_id" in signature.parameters:
-            return await llm_generate(
-                chat_provider_id=self._resolve_chat_provider_id(),
-                prompt=prompt,
-            )
+        if provider_id:
+            try:
+                return await llm_generate(
+                    chat_provider_id=provider_id,
+                    prompt=prompt,
+                )
+            except TypeError as exc:
+                if not _looks_like_legacy_llm_signature_error(exc):
+                    raise
+
         try:
             return await llm_generate(prompt=prompt)
         except TypeError as exc:
             if "chat_provider_id" not in str(exc):
                 raise
+
         return await llm_generate(
             chat_provider_id=self._resolve_chat_provider_id(),
             prompt=prompt,
         )
+
+    def _maybe_resolve_chat_provider_id(self) -> str | None:
+        try:
+            return self._resolve_chat_provider_id()
+        except Exception:
+            return None
 
     def _resolve_chat_provider_id(self) -> str:
         raw_config = {}
@@ -81,15 +89,37 @@ class CommentGenerator:
             except Exception:
                 raw_config = {}
 
-        provider_settings = raw_config.get("provider_settings") or {}
+        normalized = _normalize_mapping(raw_config)
+        provider_settings = _normalize_mapping(normalized.get("provider_settings") or {})
         provider_id = str(provider_settings.get("default_provider_id") or "").strip()
         if provider_id:
             return provider_id
 
-        providers = raw_config.get("provider") or []
+        providers = normalized.get("provider") or []
         for provider in providers:
-            provider_id = str(provider.get("id") or "").strip()
-            if provider_id and provider.get("enable", True):
+            provider_data = _normalize_mapping(provider)
+            provider_id = str(provider_data.get("id") or "").strip()
+            if provider_id and provider_data.get("enable", True):
                 return provider_id
 
         raise RuntimeError("未找到可用的聊天模型提供商，请先在 AstrBot 中配置 provider")
+
+
+def _normalize_mapping(data: Any) -> dict[str, Any]:
+    if data is None:
+        return {}
+    if hasattr(data, "model_dump"):
+        data = data.model_dump()
+    elif hasattr(data, "dict") and callable(data.dict):
+        data = data.dict()
+    elif not isinstance(data, Mapping) and hasattr(data, "__dict__"):
+        data = vars(data)
+
+    if not isinstance(data, Mapping):
+        return {}
+    return dict(data)
+
+
+def _looks_like_legacy_llm_signature_error(exc: TypeError) -> bool:
+    text = str(exc)
+    return "unexpected keyword argument 'chat_provider_id'" in text or "got an unexpected keyword argument 'chat_provider_id'" in text

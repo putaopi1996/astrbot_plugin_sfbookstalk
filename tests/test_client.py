@@ -3,7 +3,7 @@ import asyncio
 import httpx
 
 from sfacg_monitor import client as client_module
-from sfacg_monitor.client import SfNovelClient
+from sfacg_monitor.client import SfNovelClient, SfNovelParser
 
 
 NOVEL_URL = "https://book.sfacg.com/Novel/747572/"
@@ -29,6 +29,20 @@ CHAPTER_HTML = """
     <div>更新时间：2026-04-24 10:00:00</div>
     <div>字数：1234</div>
     <p>这里是章节预览内容，长度足够用于测试。</p>
+  </body>
+</html>
+"""
+
+NOISY_CHAPTER_HTML = """
+<html>
+  <body>
+    <div>首页 书库 排行榜 APP下载 载入中 VIP充值 作者福利 在线漫画</div>
+    <h1>第1章</h1>
+    <div>更新时间：2026-04-24 10:00:00</div>
+    <div>字数：1234</div>
+    <div class="article-content">
+      <p>这是正确的章节预览内容，不应该被顶部导航覆盖。</p>
+    </div>
   </body>
 </html>
 """
@@ -98,3 +112,11 @@ def test_fetch_latest_returns_partial_chapter_when_detail_page_keeps_failing(mon
     assert chapter.detail_unavailable is True
     assert chapter.chapter_url == CHAPTER_URL
     assert "暂时获取失败" in chapter.preview
+
+
+def test_parse_chapter_page_skips_navigation_noise():
+    parser = SfNovelParser(NOVEL_URL)
+
+    chapter = parser.parse_chapter_page(NOISY_CHAPTER_HTML, CHAPTER_URL)
+
+    assert chapter.preview == "这是正确的章节预览内容，不应该被顶部导航覆盖。"

@@ -121,6 +121,14 @@ class _OpaqueProviderContext(_ProviderContext):
         return await self._llm_generate_impl(**kwargs)
 
 
+class _ObjectConfigProviderContext(_ProviderContext):
+    def get_config(self):
+        return types.SimpleNamespace(
+            provider_settings=types.SimpleNamespace(default_provider_id="default"),
+            provider=[types.SimpleNamespace(id="default", enable=True)],
+        )
+
+
 def test_send_test_once_supports_legacy_runner():
     runner = _LegacyRunner()
     result = asyncio.run(_send_test_once(runner))
@@ -186,6 +194,36 @@ def test_comment_generator_retries_with_provider_id_for_opaque_signature():
         }
     )
     context = _OpaqueProviderContext()
+    generator = CommentGenerator(context, config)
+    latest = NovelLatest(
+        novel_title="示例小说",
+        author="作者",
+        latest_chapter_title="第1章",
+        latest_chapter_url="https://book.sfacg.com/vip/c/1/",
+    )
+    chapter = ChapterDetail(
+        chapter_title="第1章",
+        chapter_url="https://book.sfacg.com/vip/c/1/",
+        update_time="2026-04-24 10:00:00",
+        word_count=1234,
+        preview="预览内容",
+    )
+
+    result = asyncio.run(generator.generate(latest, chapter))
+
+    assert result == "点评完成"
+    assert context.calls
+    assert context.calls[0][0] == "default"
+
+
+def test_comment_generator_supports_object_config_provider_settings():
+    config = MonitorConfig.from_mapping(
+        {
+            "novel_url": "https://book.sfacg.com/Novel/747572/",
+            "enable_llm_comment": True,
+        }
+    )
+    context = _ObjectConfigProviderContext()
     generator = CommentGenerator(context, config)
     latest = NovelLatest(
         novel_title="示例小说",
