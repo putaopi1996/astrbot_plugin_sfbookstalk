@@ -1,0 +1,52 @@
+{
+  "novel_url": {
+    "description": "SF 轻小说主页链接，例如 https://book.sfacg.com/Novel/747572/",
+    "type": "string",
+    "default": "https://book.sfacg.com/Novel/747572/"
+  },
+  "check_interval_minutes": {
+    "description": "每隔多少分钟检查一次更新",
+    "type": "int",
+    "default": 10
+  },
+  "group_ids": {
+    "description": "需要通知的 QQ 群号列表",
+    "type": "list",
+    "default": []
+  },
+  "private_user_ids": {
+    "description": "需要通知的 QQ 号列表",
+    "type": "list",
+    "default": []
+  },
+  "notify_on_first_run": {
+    "description": "首次运行时是否发送当前最新章节",
+    "type": "bool",
+    "default": false
+  },
+  "preview_max_chars": {
+    "description": "预览内容最多发送多少字",
+    "type": "int",
+    "default": 180
+  },
+  "request_timeout_seconds": {
+    "description": "访问 SF 页面时的超时时间",
+    "type": "int",
+    "default": 15
+  },
+  "enable_llm_comment": {
+    "description": "是否启用大模型点评",
+    "type": "bool",
+    "default": true
+  },
+  "comment_prompt": {
+    "description": "点评提示词模板，可用变量：{novel_title} {author} {chapter_title} {update_time} {word_count} {preview} {chapter_url}",
+    "type": "text",
+    "default": "请根据下面的 SF 轻小说更新信息写一段简短中文点评。\\n要求：不超过 80 字；同时评价章节字数和预览内容；不剧透，不编造预览里没有的信息。\\n小说：{novel_title}\\n作者：{author}\\n章节：{chapter_title}\\n更新时间：{update_time}\\n字数：{word_count}\\n预览：{preview}"
+  },
+  "comment_fallback_text": {
+    "description": "大模型点评失败时使用的兜底点评",
+    "type": "string",
+    "default": "点评暂时生成失败，但这章已经更新，可以先去看看正文。"
+  }
+}

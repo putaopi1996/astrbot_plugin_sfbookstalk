@@ -1,14 +1,57 @@
-# astrbot-plugin-helloworld
+# SF 轻小说更新监控
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+这是一个 AstrBot 插件，用来监控指定 SF 轻小说的最新章节，并通过 OneBot/aiocqhttp 主动发送到配置好的 QQ 群和 QQ 私聊。
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+## 功能
 
-# Supports
+- 定时检查指定 SF 小说主页
+- 发现最新章节变化后抓取章节名、更新时间、字数和预览内容
+- 调用 AstrBot 当前大模型生成点评
+- 把更新消息主动发送到配置的 QQ 群和 QQ 联系人
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+## 使用前提
+
+1. AstrBot 已安装并可正常加载插件
+2. AstrBot 已接入 OneBot/aiocqhttp
+3. AstrBot 已配置可用的大模型 provider
+
+## 主要配置
+
+- `novel_url`：SF 小说主页链接
+- `check_interval_minutes`：检查间隔，单位分钟
+- `group_ids`：QQ群号列表
+- `private_user_ids`：QQ 号列表
+- `notify_on_first_run`：首次运行是否发送当前最新章节
+- `preview_max_chars`：预览内容最大长度
+- `enable_llm_comment`：是否启用大模型点评
+- `comment_prompt`：点评提示词模板
+- `comment_fallback_text`：大模型失败时的兜底点评
+
+## 消息格式
+
+`（作者名）在xxx（时间）更新了字数为xxx的最新章节（章节名）`
+
+消息还会包含：
+
+- 小说名
+- 章节链接
+- 预览内容
+- 大模型点评
+
+## 提示词变量
+
+`comment_prompt` 可使用这些变量：
+
+- `{novel_title}`
+- `{author}`
+- `{chapter_title}`
+- `{update_time}`
+- `{word_count}`
+- `{preview}`
+- `{chapter_url}`
+
+## 注意事项
+
+- 第一版只支持监控一本小说
+- 第一版只支持 OneBot/aiocqhttp 主动发送
+- SF 页面结构如果变化，可能需要更新解析规则
