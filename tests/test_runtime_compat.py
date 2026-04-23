@@ -289,3 +289,70 @@ def test_send_test_once_handles_stale_message_builder(monkeypatch):
 
     assert result.startswith("【测试】")
     assert runner.sent_messages == [result]
+
+
+def test_initialize_uses_fresh_runtime_components_on_hot_reload(monkeypatch):
+    created = {}
+
+    class _FreshClient:
+        def __init__(self, novel_url, timeout_seconds):
+            created["client"] = (novel_url, timeout_seconds)
+
+    class _FreshCommenter:
+        def __init__(self, context, config):
+            created["commenter"] = (context, config)
+
+    class _FreshSender:
+        def __init__(self, context, config):
+            created["sender"] = (context, config)
+
+    class _FreshRunner:
+        def __init__(self, config, client, commenter, sender, state_store):
+            created["runner"] = (config, client, commenter, sender, state_store)
+
+        async def run_forever(self):
+            return None
+
+    class _StaleClient:
+        def __init__(self, *_args, **_kwargs):
+            raise AssertionError("stale client should not be used")
+
+    class _StaleCommenter:
+        def __init__(self, *_args, **_kwargs):
+            raise AssertionError("stale commenter should not be used")
+
+    def _fake_create_task(coro):
+        coro.close()
+        return types.SimpleNamespace(cancel=lambda: None)
+
+    monkeypatch.setattr(plugin_main, "SfNovelClient", _StaleClient, raising=False)
+    monkeypatch.setattr(plugin_main, "CommentGenerator", _StaleCommenter, raising=False)
+    monkeypatch.setattr(asyncio, "create_task", _fake_create_task)
+    monkeypatch.setattr(plugin_main.importlib, "reload", lambda module: module)
+
+    monkeypatch.setattr(sys.modules["sfacg_monitor.client"], "SfNovelClient", _FreshClient)
+    monkeypatch.setattr(sys.modules["sfacg_monitor.comments"], "CommentGenerator", _FreshCommenter)
+    monkeypatch.setattr(sys.modules["sfacg_monitor.sender"], "OneBotSender", _FreshSender)
+    monkeypatch.setattr(sys.modules["sfacg_monitor.monitor"], "MonitorRunner", _FreshRunner)
+
+    context = types.SimpleNamespace(
+        get_config=lambda: {
+            "provider_settings": {"default_provider_id": "default"},
+            "provider": [{"id": "default", "enable": True}],
+        }
+    )
+    plugin = object.__new__(plugin_main.SFBooksTalkPlugin)
+    plugin.context = context
+    plugin._plugin_config = {
+        "novel_url": "https://book.sfacg.com/Novel/747572/",
+        "group_ids": ["123456"],
+    }
+    plugin._task = None
+    plugin._runner = None
+
+    asyncio.run(plugin.initialize())
+
+    assert "client" in created
+    assert "commenter" in created
+    assert "sender" in created
+    assert "runner" in created

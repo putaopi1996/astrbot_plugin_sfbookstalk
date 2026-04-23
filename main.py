@@ -1,8 +1,9 @@
 import asyncio
+import importlib
 import sys
 from pathlib import Path
-from typing import Any
-from typing import Mapping
+from types import SimpleNamespace
+from typing import Any, Mapping
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 if str(PLUGIN_DIR) not in sys.path:
@@ -12,14 +13,6 @@ from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
-from sfacg_monitor.client import SfNovelClient
-from sfacg_monitor.comments import CommentGenerator
-from sfacg_monitor.config import MonitorConfig
-from sfacg_monitor.message_compat import render_update_message
-from sfacg_monitor.monitor import MonitorRunner
-from sfacg_monitor.sender import OneBotSender
-from sfacg_monitor.state import KvStateStore
-
 
 @register("astrbot_plugin_sfbookstalk", "putaopi1996", "监控 SF 轻小说更新并推送到 QQ", "1.0.0")
 class SFBooksTalkPlugin(Star):
@@ -27,7 +20,7 @@ class SFBooksTalkPlugin(Star):
         super().__init__(context)
         self._plugin_config = config
         self._task: asyncio.Task | None = None
-        self._runner: MonitorRunner | None = None
+        self._runner = None
 
     async def initialize(self):
         raw_global_config = None
@@ -41,12 +34,14 @@ class SFBooksTalkPlugin(Star):
             source_config = self._plugin_config
             if not _looks_like_plugin_config(source_config):
                 source_config = raw_global_config
-            config = MonitorConfig.from_mapping(source_config)
-            client = SfNovelClient(config.novel_url, config.request_timeout_seconds)
-            commenter = CommentGenerator(self.context, config)
-            sender = OneBotSender(self.context, config)
-            state = KvStateStore(self)
-            self._runner = MonitorRunner(config, client, commenter, sender, state)
+
+            runtime = _load_runtime_components()
+            config = runtime.MonitorConfig.from_mapping(source_config)
+            client = runtime.SfNovelClient(config.novel_url, config.request_timeout_seconds)
+            commenter = runtime.CommentGenerator(self.context, config)
+            sender = runtime.OneBotSender(self.context, config)
+            state = runtime.KvStateStore(self)
+            self._runner = runtime.MonitorRunner(config, client, commenter, sender, state)
             self._task = asyncio.create_task(self._runner.run_forever())
             logger.info("SFBooksTalk 插件已启动")
         except Exception as exc:
@@ -117,6 +112,8 @@ def _looks_like_plugin_config(raw_config: Any) -> bool:
 
 
 async def _send_test_once(runner: Any) -> str:
+    runtime = _load_runtime_components()
+
     if hasattr(runner, "send_test_once"):
         return await runner.send_test_once()
     if hasattr(runner, "_process_once"):
@@ -131,7 +128,7 @@ async def _send_test_once(runner: Any) -> str:
     if hasattr(sender, "has_targets") and not sender.has_targets():
         raise RuntimeError("没有可发送的 QQ 群或 QQ 目标，请先配置 group_ids 或 private_user_ids")
     comment = await runner.commenter.generate(latest, chapter)
-    message = render_update_message(
+    message = runtime.render_update_message(
         latest,
         chapter,
         comment,
@@ -140,3 +137,33 @@ async def _send_test_once(runner: Any) -> str:
     )
     await sender.send_text(message)
     return message
+
+
+def _load_runtime_components():
+    module_names = (
+        "sfacg_monitor.client",
+        "sfacg_monitor.comments",
+        "sfacg_monitor.config",
+        "sfacg_monitor.message_compat",
+        "sfacg_monitor.monitor",
+        "sfacg_monitor.sender",
+        "sfacg_monitor.state",
+    )
+    modules: dict[str, Any] = {}
+    for module_name in module_names:
+        module = sys.modules.get(module_name)
+        if module is None:
+            module = importlib.import_module(module_name)
+        else:
+            module = importlib.reload(module)
+        modules[module_name] = module
+
+    return SimpleNamespace(
+        SfNovelClient=modules["sfacg_monitor.client"].SfNovelClient,
+        CommentGenerator=modules["sfacg_monitor.comments"].CommentGenerator,
+        MonitorConfig=modules["sfacg_monitor.config"].MonitorConfig,
+        render_update_message=modules["sfacg_monitor.message_compat"].render_update_message,
+        MonitorRunner=modules["sfacg_monitor.monitor"].MonitorRunner,
+        OneBotSender=modules["sfacg_monitor.sender"].OneBotSender,
+        KvStateStore=modules["sfacg_monitor.state"].KvStateStore,
+    )
