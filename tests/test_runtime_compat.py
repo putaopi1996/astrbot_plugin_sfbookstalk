@@ -4,6 +4,7 @@ import types
 
 from sfacg_monitor.comments import CommentGenerator
 from sfacg_monitor.config import MonitorConfig
+from sfacg_monitor.messages import build_update_message
 from sfacg_monitor.models import ChapterDetail, NovelLatest
 
 
@@ -50,11 +51,38 @@ from main import _send_test_once
 
 class _LegacyRunner:
     def __init__(self):
-        self.calls = []
+        self.config = types.SimpleNamespace(
+            preview_max_chars=180,
+            group_ids=("123456",),
+            private_user_ids=(),
+        )
+        self.client = types.SimpleNamespace(fetch_latest=self._fetch_latest)
+        self.commenter = types.SimpleNamespace(generate=self._generate_comment)
+        self.sender = types.SimpleNamespace(has_targets=lambda: True, send_text=self._send_text)
+        self.state_store = types.SimpleNamespace()
+        self.sent_messages = []
 
-    async def _process_once(self, force_send: bool, title_prefix: str):
-        self.calls.append((force_send, title_prefix))
-        return "ok"
+    async def _fetch_latest(self):
+        latest = NovelLatest(
+            novel_title="示例小说",
+            author="作者",
+            latest_chapter_title="第1章",
+            latest_chapter_url="https://book.sfacg.com/vip/c/1/",
+        )
+        chapter = ChapterDetail(
+            chapter_title="第1章",
+            chapter_url="https://book.sfacg.com/vip/c/1/",
+            update_time="2026-04-24 10:00:00",
+            word_count=1234,
+            preview="预览内容",
+        )
+        return latest, chapter
+
+    async def _generate_comment(self, latest, chapter):
+        return "点评完成"
+
+    async def _send_text(self, message):
+        self.sent_messages.append(message)
 
 
 class _FakeResponse:
@@ -78,9 +106,30 @@ class _ProviderContext:
 
 
 def test_send_test_once_supports_legacy_runner():
-    result = asyncio.run(_send_test_once(_LegacyRunner()))
+    runner = _LegacyRunner()
+    result = asyncio.run(_send_test_once(runner))
 
-    assert result == "ok"
+    expected = build_update_message(
+        NovelLatest(
+            novel_title="示例小说",
+            author="作者",
+            latest_chapter_title="第1章",
+            latest_chapter_url="https://book.sfacg.com/vip/c/1/",
+        ),
+        ChapterDetail(
+            chapter_title="第1章",
+            chapter_url="https://book.sfacg.com/vip/c/1/",
+            update_time="2026-04-24 10:00:00",
+            word_count=1234,
+            preview="预览内容",
+        ),
+        "点评完成",
+        180,
+        title_prefix="【测试】",
+    )
+
+    assert result == expected
+    assert runner.sent_messages == [expected]
 
 
 def test_comment_generator_supplies_default_provider_id():
