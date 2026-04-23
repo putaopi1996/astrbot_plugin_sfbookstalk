@@ -62,7 +62,7 @@ class SFBooksTalkPlugin(Star):
             yield event.plain_result("SFBooksTalk 还没有完成初始化，请先检查 novel_url 和插件日志。")
             return
         try:
-            message = await self._runner.send_test_once()
+            message = await _send_test_once(self._runner)
         except Exception as exc:
             logger.exception(f"SFBooksTalk 测试发送失败：{exc}")
             yield event.plain_result(f"测试发送失败：{exc}")
@@ -113,3 +113,11 @@ def _looks_like_plugin_config(raw_config: Any) -> bool:
             "comment_fallback_text",
         )
     )
+
+
+async def _send_test_once(runner: Any) -> str:
+    if hasattr(runner, "send_test_once"):
+        return await runner.send_test_once()
+    if hasattr(runner, "_process_once"):
+        return await runner._process_once(force_send=True, title_prefix="【测试】")
+    raise AttributeError("MonitorRunner 缺少测试发送入口")
