@@ -1,6 +1,6 @@
-name: sfacg_monitor
-display_name: SF 轻小说更新监控
+name: astrbot_plugin_sfbookstalk
+display_name: SFBooksTalk
 desc: 监控 SF 轻小说最新章节，并通过 OneBot 推送到 QQ 群和私聊
 version: v1.0.0
 author: putaopi1996
-repo: https://github.com/putaopi1996/bot-temp
+repo: https://github.com/putaopi1996/astrbot_plugin_sfbookstalk

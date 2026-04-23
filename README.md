@@ -1,6 +1,6 @@
-# SF 轻小说更新监控
+# SFBooksTalk
 
-这是一个 AstrBot 插件，用来监控指定 SF 轻小说的最新章节，并通过 OneBot/aiocqhttp 主动发送到配置好的 QQ 群和 QQ 私聊。
+`astrbot_plugin_sfbookstalk` 是一个 AstrBot 插件，用来监控指定 SF 轻小说的最新章节，并通过 OneBot/aiocqhttp 主动发送到配置好的 QQ 群和 QQ 私聊。
 
 ## 功能
 
@@ -31,12 +31,7 @@
 
 `（作者名）在xxx（时间）更新了字数为xxx的最新章节（章节名）`
 
-消息还会包含：
-
-- 小说名
-- 章节链接
-- 预览内容
-- 大模型点评
+消息还会包含预览内容和大模型点评。
 
 ## 提示词变量
 

@@ -11,8 +11,8 @@ from sfacg_monitor.sender import OneBotSender
 from sfacg_monitor.state import KvStateStore
 
 
-@register("sfacg_monitor", "putaopi1996", "监控 SF 轻小说更新并推送到 QQ", "1.0.0")
-class SfMonitorPlugin(Star):
+@register("astrbot_plugin_sfbookstalk", "putaopi1996", "监控 SF 轻小说更新并推送到 QQ", "1.0.0")
+class SFBooksTalkPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self._task: asyncio.Task | None = None
@@ -28,9 +28,9 @@ class SfMonitorPlugin(Star):
             state = KvStateStore(self)
             self._runner = MonitorRunner(config, client, commenter, sender, state)
             self._task = asyncio.create_task(self._runner.run_forever())
-            logger.info("SFACG 更新监控插件已启动")
+            logger.info("SFBooksTalk 插件已启动")
         except Exception as exc:
-            logger.exception(f"SFACG 更新监控插件初始化失败：{exc}")
+            logger.exception(f"SFBooksTalk 插件初始化失败：{exc}")
 
     async def terminate(self):
         if self._runner:
@@ -41,4 +41,4 @@ class SfMonitorPlugin(Star):
                 await self._task
             except asyncio.CancelledError:
                 pass
-        logger.info("SFACG 更新监控插件已停止")
+        logger.info("SFBooksTalk 插件已停止")
