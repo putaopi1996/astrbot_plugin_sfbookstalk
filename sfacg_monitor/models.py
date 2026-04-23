@@ -22,3 +22,4 @@ class ChapterDetail:
     word_count: int
     preview: str
     chapter_url: str
+    detail_unavailable: bool = False

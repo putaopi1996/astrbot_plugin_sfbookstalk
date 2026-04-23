@@ -208,6 +208,37 @@ def test_comment_generator_retries_with_provider_id_for_opaque_signature():
     assert context.calls[0][0] == "default"
 
 
+def test_comment_generator_uses_fallback_for_partial_chapter():
+    config = MonitorConfig.from_mapping(
+        {
+            "novel_url": "https://book.sfacg.com/Novel/747572/",
+            "enable_llm_comment": True,
+            "comment_fallback_text": "先去看正文",
+        }
+    )
+    context = _ProviderContext()
+    generator = CommentGenerator(context, config)
+    latest = NovelLatest(
+        novel_title="示例小说",
+        author="作者",
+        latest_chapter_title="第1章",
+        latest_chapter_url="https://book.sfacg.com/vip/c/1/",
+    )
+    chapter = ChapterDetail(
+        chapter_title="第1章",
+        chapter_url="https://book.sfacg.com/vip/c/1/",
+        update_time="",
+        word_count=0,
+        preview="章节详情暂时获取失败，请直接打开原文链接查看。",
+        detail_unavailable=True,
+    )
+
+    result = asyncio.run(generator.generate(latest, chapter))
+
+    assert result == "先去看正文"
+    assert context.calls == []
+
+
 def test_send_test_once_handles_stale_message_builder(monkeypatch):
     runner = _LegacyRunner()
 

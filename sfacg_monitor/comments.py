@@ -25,6 +25,8 @@ class CommentGenerator:
     async def generate(self, latest: "NovelLatest", chapter: "ChapterDetail") -> str:
         if not getattr(self.config, "enable_llm_comment", True):
             return getattr(self.config, "comment_fallback_text", "")
+        if getattr(chapter, "detail_unavailable", False):
+            return getattr(self.config, "comment_fallback_text", "")
 
         prompt_template = getattr(self.config, "comment_prompt", "")
         try:
