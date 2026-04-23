@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .messages import build_update_message, build_update_messages
+from . import messages as messages_module
 
 
 def render_update_messages(
@@ -10,21 +10,21 @@ def render_update_messages(
     preview_max_chars: int,
     title_prefix: str = "",
 ) -> list[str]:
+    build_update_messages = getattr(messages_module, "build_update_messages", None)
     try:
-        return build_update_messages(
-            latest,
-            chapter,
-            comment,
-            preview_max_chars,
-            title_prefix=title_prefix,
-        )
-    except NameError:
-        pass
+        if build_update_messages is not None:
+            return build_update_messages(
+                latest,
+                chapter,
+                comment,
+                preview_max_chars,
+                title_prefix=title_prefix,
+            )
     except TypeError as exc:
         if "title_prefix" not in str(exc):
             raise
 
-    message = build_update_message(
+    message = messages_module.build_update_message(
         latest,
         chapter,
         comment,

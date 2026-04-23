@@ -315,8 +315,8 @@ def test_send_test_once_handles_stale_message_builder(monkeypatch):
     def old_build_update_message(latest, chapter, comment, preview_max_chars):
         return build_update_message(latest, chapter, comment, preview_max_chars)
 
-    monkeypatch.delattr(message_compat, "build_update_messages", raising=False)
-    monkeypatch.setattr(message_compat, "build_update_message", old_build_update_message)
+    stale_messages = types.SimpleNamespace(build_update_message=old_build_update_message)
+    monkeypatch.setattr(message_compat, "messages_module", stale_messages)
 
     result = asyncio.run(plugin_main._send_test_once(runner))
 
@@ -393,3 +393,36 @@ def test_initialize_uses_fresh_runtime_components_on_hot_reload(monkeypatch):
     assert "commenter" in created
     assert "sender" in created
     assert "runner" in created
+
+
+def test_load_runtime_components_reloads_messages_before_message_compat(monkeypatch):
+    stale_messages = types.ModuleType("sfacg_monitor.messages")
+    stale_messages.build_update_message = lambda *_args, **_kwargs: "header\npreview\ncomment"
+    stale_message_compat = types.ModuleType("sfacg_monitor.message_compat")
+    stale_message_compat.render_update_message = lambda *_args, **_kwargs: "unused"
+    stale_message_compat.render_update_messages = lambda *_args, **_kwargs: ["unused"]
+
+    monkeypatch.setitem(sys.modules, "sfacg_monitor.messages", stale_messages)
+    monkeypatch.setitem(sys.modules, "sfacg_monitor.message_compat", stale_message_compat)
+
+    reload_order = []
+
+    def fake_reload(module):
+        reload_order.append(module.__name__)
+        if module.__name__ == "sfacg_monitor.messages":
+            module.build_update_messages = lambda *_args, **_kwargs: ["header", "preview", "comment"]
+            return module
+        if module.__name__ == "sfacg_monitor.message_compat":
+            if not hasattr(sys.modules["sfacg_monitor.messages"], "build_update_messages"):
+                raise ImportError("cannot import name 'build_update_messages' from 'sfacg_monitor.messages'")
+            module.render_update_message = lambda *_args, **_kwargs: "header\npreview\ncomment"
+            module.render_update_messages = lambda *_args, **_kwargs: ["header", "preview", "comment"]
+            return module
+        return module
+
+    monkeypatch.setattr(plugin_main.importlib, "reload", fake_reload)
+
+    runtime = plugin_main._load_runtime_components()
+
+    assert runtime.render_update_messages(None, None, "", 0) == ["header", "preview", "comment"]
+    assert reload_order.index("sfacg_monitor.messages") < reload_order.index("sfacg_monitor.message_compat")

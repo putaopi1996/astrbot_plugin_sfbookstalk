@@ -152,6 +152,7 @@ def _load_runtime_components():
         "sfacg_monitor.client",
         "sfacg_monitor.comments",
         "sfacg_monitor.config",
+        "sfacg_monitor.messages",
         "sfacg_monitor.message_compat",
         "sfacg_monitor.monitor",
         "sfacg_monitor.sender",
