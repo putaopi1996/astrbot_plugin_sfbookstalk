@@ -22,17 +22,22 @@ from sfacg_monitor.state import KvStateStore
 
 @register("astrbot_plugin_sfbookstalk", "putaopi1996", "监控 SF 轻小说更新并推送到 QQ", "1.0.0")
 class SFBooksTalkPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: Any = None):
         super().__init__(context)
+        self._plugin_config = config
         self._task: asyncio.Task | None = None
         self._runner: MonitorRunner | None = None
 
     async def initialize(self):
-        raw_config = None
+        raw_global_config = None
         try:
-            raw_config = self.context.get_config()
-            logger.info(f"SFBooksTalk 读取到配置结构：{_describe_config_shape(raw_config)}")
-            config = MonitorConfig.from_mapping(raw_config)
+            raw_global_config = self.context.get_config()
+            logger.info(
+                "SFBooksTalk 读取到配置结构："
+                f"plugin={_describe_config_shape(self._plugin_config)}; "
+                f"global={_describe_config_shape(raw_global_config)}"
+            )
+            config = MonitorConfig.from_sources(self._plugin_config, raw_global_config)
             client = SfNovelClient(config.novel_url, config.request_timeout_seconds)
             commenter = CommentGenerator(self.context, config)
             sender = OneBotSender(self.context, config)
@@ -42,7 +47,9 @@ class SFBooksTalkPlugin(Star):
             logger.info("SFBooksTalk 插件已启动")
         except Exception as exc:
             logger.exception(
-                f"SFBooksTalk 插件初始化失败：{exc}；配置结构：{_describe_config_shape(raw_config)}"
+                "SFBooksTalk 插件初始化失败："
+                f"{exc}；plugin={_describe_config_shape(self._plugin_config)}；"
+                f"global={_describe_config_shape(raw_global_config)}"
             )
 
     @filter.command("sfbookstalk_test_send")

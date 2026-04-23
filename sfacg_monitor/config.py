@@ -36,6 +36,13 @@ class MonitorConfig:
     comment_fallback_text: str = DEFAULT_COMMENT_FALLBACK_TEXT
 
     @classmethod
+    def from_sources(cls, plugin_config: Any, fallback_config: Any = None) -> "MonitorConfig":
+        primary = _normalize_mapping(plugin_config)
+        if _looks_like_plugin_config(primary):
+            return cls.from_mapping(primary)
+        return cls.from_mapping(fallback_config)
+
+    @classmethod
     def from_mapping(cls, data: Any) -> "MonitorConfig":
         data = _normalize_mapping(data)
         novel_url = str(_unwrap_field_value(data.get("novel_url", ""))).strip()
@@ -118,3 +125,21 @@ def _unwrap_field_value(value: Any) -> Any:
             if key in value:
                 return value[key]
     return value
+
+
+def _looks_like_plugin_config(data: Mapping[str, Any]) -> bool:
+    return any(
+        key in data
+        for key in (
+            "novel_url",
+            "check_interval_minutes",
+            "group_ids",
+            "private_user_ids",
+            "notify_on_first_run",
+            "preview_max_chars",
+            "request_timeout_seconds",
+            "enable_llm_comment",
+            "comment_prompt",
+            "comment_fallback_text",
+        )
+    )
