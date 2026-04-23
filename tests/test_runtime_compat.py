@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
 
 from sfacg_monitor.comments import CommentGenerator
 from sfacg_monitor.config import MonitorConfig
-from sfacg_monitor.messages import build_update_message
+from sfacg_monitor.messages import build_update_message, build_update_messages
 from sfacg_monitor.models import ChapterDetail, NovelLatest
 
 
@@ -133,7 +133,7 @@ def test_send_test_once_supports_legacy_runner():
     runner = _LegacyRunner()
     result = asyncio.run(_send_test_once(runner))
 
-    expected = build_update_message(
+    expected = build_update_messages(
         NovelLatest(
             novel_title="示例小说",
             author="作者",
@@ -149,11 +149,43 @@ def test_send_test_once_supports_legacy_runner():
         ),
         "点评完成",
         180,
-        title_prefix="【测试】",
     )
 
     assert result == expected
-    assert runner.sent_messages == [expected]
+    assert runner.sent_messages == expected
+
+
+def test_test_send_command_yields_three_reply_messages(monkeypatch):
+    plugin = object.__new__(plugin_main.SFBooksTalkPlugin)
+    plugin._runner = object()
+
+    async def _fake_send_test_once(_runner):
+        return [
+            "（作者）更新了最新章节（第1章）",
+            "预览：预览内容",
+            "点评：点评完成",
+        ]
+
+    class _Event:
+        @staticmethod
+        def plain_result(message):
+            return message
+
+    async def _collect():
+        replies = []
+        async for item in plugin.sfbookstalk_test_send(_Event()):
+            replies.append(item)
+        return replies
+
+    monkeypatch.setattr(plugin_main, "_send_test_once", _fake_send_test_once)
+
+    replies = asyncio.run(_collect())
+
+    assert replies == [
+        "测试发送完成，已按正式流程发送通知。\n\n（作者）更新了最新章节（第1章）",
+        "预览：预览内容",
+        "点评：点评完成",
+    ]
 
 
 def test_comment_generator_supplies_default_provider_id():
@@ -283,12 +315,17 @@ def test_send_test_once_handles_stale_message_builder(monkeypatch):
     def old_build_update_message(latest, chapter, comment, preview_max_chars):
         return build_update_message(latest, chapter, comment, preview_max_chars)
 
+    monkeypatch.delattr(message_compat, "build_update_messages", raising=False)
     monkeypatch.setattr(message_compat, "build_update_message", old_build_update_message)
 
     result = asyncio.run(plugin_main._send_test_once(runner))
 
-    assert result.startswith("【测试】")
-    assert runner.sent_messages == [result]
+    assert result == [
+        "（作者）在2026-04-24 10:00:00更新了字数为1234的最新章节（第1章）",
+        "预览：预览内容",
+        "点评：点评完成",
+    ]
+    assert runner.sent_messages == result
 
 
 def test_initialize_uses_fresh_runtime_components_on_hot_reload(monkeypatch):

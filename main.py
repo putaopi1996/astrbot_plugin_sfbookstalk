@@ -53,18 +53,22 @@ class SFBooksTalkPlugin(Star):
 
     @filter.command("sfbookstalk_test_send")
     async def sfbookstalk_test_send(self, event: AstrMessageEvent):
-        """立即抓取当前最新章节并强制发送一条【测试】通知。"""
+        """立即抓取当前最新章节并强制发送一次通知。"""
         if self._runner is None:
             yield event.plain_result("SFBooksTalk 还没有完成初始化，请先检查 novel_url 和插件日志。")
             return
         try:
-            message = await _send_test_once(self._runner)
+            messages = await _send_test_once(self._runner)
         except Exception as exc:
             logger.exception(f"SFBooksTalk 测试发送失败：{exc}")
             yield event.plain_result(f"测试发送失败：{exc}")
             return
         logger.info("SFBooksTalk 已完成一次手动测试发送")
-        yield event.plain_result(f"测试发送完成，已按正式流程发送通知。\n\n{message}")
+        for index, message in enumerate(messages):
+            if index == 0:
+                yield event.plain_result(f"测试发送完成，已按正式流程发送通知。\n\n{message}")
+            else:
+                yield event.plain_result(message)
 
     async def terminate(self):
         if self._runner:
@@ -111,13 +115,13 @@ def _looks_like_plugin_config(raw_config: Any) -> bool:
     )
 
 
-async def _send_test_once(runner: Any) -> str:
+async def _send_test_once(runner: Any) -> list[str]:
     runtime = _load_runtime_components()
 
     if hasattr(runner, "send_test_once"):
         return await runner.send_test_once()
     if hasattr(runner, "_process_once"):
-        return await runner._process_once(force_send=True, title_prefix="【测试】")
+        return await runner._process_once(force_send=True, title_prefix="")
 
     required_attrs = ("client", "commenter", "sender", "config")
     if not all(hasattr(runner, attr) for attr in required_attrs):
@@ -128,15 +132,19 @@ async def _send_test_once(runner: Any) -> str:
     if hasattr(sender, "has_targets") and not sender.has_targets():
         raise RuntimeError("没有可发送的 QQ 群或 QQ 目标，请先配置 group_ids 或 private_user_ids")
     comment = await runner.commenter.generate(latest, chapter)
-    message = runtime.render_update_message(
+    messages = runtime.render_update_messages(
         latest,
         chapter,
         comment,
         getattr(runner.config, "preview_max_chars", 180),
-        title_prefix="【测试】",
+        title_prefix="",
     )
-    await sender.send_text(message)
-    return message
+    if hasattr(sender, "send_texts"):
+        await sender.send_texts(messages)
+    else:
+        for message in messages:
+            await sender.send_text(message)
+    return messages
 
 
 def _load_runtime_components():
@@ -163,6 +171,7 @@ def _load_runtime_components():
         CommentGenerator=modules["sfacg_monitor.comments"].CommentGenerator,
         MonitorConfig=modules["sfacg_monitor.config"].MonitorConfig,
         render_update_message=modules["sfacg_monitor.message_compat"].render_update_message,
+        render_update_messages=modules["sfacg_monitor.message_compat"].render_update_messages,
         MonitorRunner=modules["sfacg_monitor.monitor"].MonitorRunner,
         OneBotSender=modules["sfacg_monitor.sender"].OneBotSender,
         KvStateStore=modules["sfacg_monitor.state"].KvStateStore,

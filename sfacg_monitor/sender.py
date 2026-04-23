@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from .compat import filter, logger
 from .config import MonitorConfig
 
@@ -13,11 +15,20 @@ class OneBotSender:
         return bool(self.config.group_ids or self.config.private_user_ids)
 
     async def send_text(self, message: str) -> None:
+        await self.send_texts([message])
+
+    async def send_texts(self, messages: Sequence[str]) -> None:
+        normalized_messages = [message for message in messages if message]
+        if not normalized_messages:
+            return
+
         client = self._get_client()
         for group_id in self.config.group_ids:
-            await self._safe_call(client, "send_group_msg", group_id=int(group_id), message=message)
+            for message in normalized_messages:
+                await self._safe_call(client, "send_group_msg", group_id=int(group_id), message=message)
         for user_id in self.config.private_user_ids:
-            await self._safe_call(client, "send_private_msg", user_id=int(user_id), message=message)
+            for message in normalized_messages:
+                await self._safe_call(client, "send_private_msg", user_id=int(user_id), message=message)
 
     def _get_client(self):
         platform = self.context.get_platform(filter.PlatformAdapterType.AIOCQHTTP)
