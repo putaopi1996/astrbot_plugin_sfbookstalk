@@ -7,6 +7,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from astrbot.api import logger
+from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 from sfacg_monitor.client import SfNovelClient
@@ -37,6 +38,21 @@ class SFBooksTalkPlugin(Star):
             logger.info("SFBooksTalk 插件已启动")
         except Exception as exc:
             logger.exception(f"SFBooksTalk 插件初始化失败：{exc}")
+
+    @filter.command("sfbookstalk_test_send")
+    async def sfbookstalk_test_send(self, event: AstrMessageEvent):
+        """立即抓取当前最新章节并强制发送一条【测试】通知。"""
+        if self._runner is None:
+            yield event.plain_result("SFBooksTalk 还没有完成初始化，请稍后再试。")
+            return
+        try:
+            message = await self._runner.send_test_once()
+        except Exception as exc:
+            logger.exception(f"SFBooksTalk 测试发送失败：{exc}")
+            yield event.plain_result(f"测试发送失败：{exc}")
+            return
+        logger.info("SFBooksTalk 已完成一次手动测试发送")
+        yield event.plain_result(f"测试发送完成，已按正式流程发送通知。\n\n{message}")
 
     async def terminate(self):
         if self._runner:

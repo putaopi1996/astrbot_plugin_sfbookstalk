@@ -9,6 +9,9 @@ class OneBotSender:
         self.context = context
         self.config = config
 
+    def has_targets(self) -> bool:
+        return bool(self.config.group_ids or self.config.private_user_ids)
+
     async def send_text(self, message: str) -> None:
         client = self._get_client()
         for group_id in self.config.group_ids:

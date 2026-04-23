@@ -11,11 +11,12 @@ def build_update_message(
     chapter: "ChapterDetail",
     comment: str,
     preview_max_chars: int,
+    title_prefix: str = "",
 ) -> str:
     preview = _truncate(chapter.preview or "暂无预览内容", preview_max_chars)
     return "\n".join(
         [
-            f"（{latest.author}）在{chapter.update_time}更新了字数为{chapter.word_count}的最新章节（{chapter.chapter_title}）",
+            f"{title_prefix}（{latest.author}）在{chapter.update_time}更新了字数为{chapter.word_count}的最新章节（{chapter.chapter_title}）",
             f"预览：{preview}",
             f"点评：{comment}",
         ]
