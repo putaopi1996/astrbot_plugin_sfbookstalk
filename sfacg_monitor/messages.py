@@ -16,8 +16,6 @@ def build_update_message(
     return "\n".join(
         [
             f"（{latest.author}）在{chapter.update_time}更新了字数为{chapter.word_count}的最新章节（{chapter.chapter_title}）",
-            f"小说：{latest.novel_title}",
-            f"链接：{chapter.chapter_url}",
             f"预览：{preview}",
             f"点评：{comment}",
         ]
