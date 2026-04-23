@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping
 from typing import Any
 
 
@@ -35,35 +36,37 @@ class MonitorConfig:
     comment_fallback_text: str = DEFAULT_COMMENT_FALLBACK_TEXT
 
     @classmethod
-    def from_mapping(cls, data: dict[str, Any] | None) -> "MonitorConfig":
-        data = data or {}
-        novel_url = str(data.get("novel_url", "")).strip()
+    def from_mapping(cls, data: Any) -> "MonitorConfig":
+        data = _normalize_mapping(data)
+        novel_url = str(_unwrap_field_value(data.get("novel_url", ""))).strip()
         if not novel_url:
             raise ValueError("novel_url 不能为空")
 
-        interval = int(data.get("check_interval_minutes", 10))
+        interval = int(_unwrap_field_value(data.get("check_interval_minutes", 10)))
         if interval < 1:
             raise ValueError("check_interval_minutes 必须大于等于 1")
 
-        preview_max_chars = int(data.get("preview_max_chars", 180))
+        preview_max_chars = int(_unwrap_field_value(data.get("preview_max_chars", 180)))
         if preview_max_chars < 20:
             raise ValueError("preview_max_chars 必须大于等于 20")
 
-        timeout = int(data.get("request_timeout_seconds", 15))
+        timeout = int(_unwrap_field_value(data.get("request_timeout_seconds", 15)))
         if timeout < 3:
             raise ValueError("check_interval_minutes 或 request_timeout_seconds 配置无效")
 
         return cls(
             novel_url=novel_url,
             check_interval_minutes=interval,
-            group_ids=tuple(_normalize_ids(data.get("group_ids", []))),
-            private_user_ids=tuple(_normalize_ids(data.get("private_user_ids", []))),
-            notify_on_first_run=bool(data.get("notify_on_first_run", False)),
+            group_ids=tuple(_normalize_ids(_unwrap_field_value(data.get("group_ids", [])))),
+            private_user_ids=tuple(_normalize_ids(_unwrap_field_value(data.get("private_user_ids", [])))),
+            notify_on_first_run=bool(_unwrap_field_value(data.get("notify_on_first_run", False))),
             preview_max_chars=preview_max_chars,
             request_timeout_seconds=timeout,
-            enable_llm_comment=bool(data.get("enable_llm_comment", True)),
-            comment_prompt=str(data.get("comment_prompt") or DEFAULT_COMMENT_PROMPT),
-            comment_fallback_text=str(data.get("comment_fallback_text") or DEFAULT_COMMENT_FALLBACK_TEXT),
+            enable_llm_comment=bool(_unwrap_field_value(data.get("enable_llm_comment", True))),
+            comment_prompt=str(_unwrap_field_value(data.get("comment_prompt")) or DEFAULT_COMMENT_PROMPT),
+            comment_fallback_text=str(
+                _unwrap_field_value(data.get("comment_fallback_text")) or DEFAULT_COMMENT_FALLBACK_TEXT
+            ),
         )
 
     @property
@@ -84,3 +87,34 @@ def _normalize_ids(value: Any) -> list[str]:
         if text:
             ids.append(text)
     return ids
+
+
+def _normalize_mapping(data: Any) -> dict[str, Any]:
+    if data is None:
+        return {}
+    if hasattr(data, "model_dump"):
+        data = data.model_dump()
+    elif hasattr(data, "dict") and callable(data.dict):
+        data = data.dict()
+    elif not isinstance(data, Mapping) and hasattr(data, "__dict__"):
+        data = vars(data)
+
+    if not isinstance(data, Mapping):
+        return {}
+
+    normalized = dict(data)
+    for key in ("config", "settings", "data", "value"):
+        nested = normalized.get(key)
+        if "novel_url" in normalized:
+            break
+        if isinstance(nested, Mapping):
+            return dict(nested)
+    return normalized
+
+
+def _unwrap_field_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        for key in ("value", "data", "current", "default"):
+            if key in value:
+                return value[key]
+    return value

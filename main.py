@@ -1,6 +1,8 @@
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any
+from typing import Mapping
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 if str(PLUGIN_DIR) not in sys.path:
@@ -26,8 +28,10 @@ class SFBooksTalkPlugin(Star):
         self._runner: MonitorRunner | None = None
 
     async def initialize(self):
+        raw_config = None
         try:
-            raw_config = self.context.get_config() or {}
+            raw_config = self.context.get_config()
+            logger.info(f"SFBooksTalk 读取到配置结构：{_describe_config_shape(raw_config)}")
             config = MonitorConfig.from_mapping(raw_config)
             client = SfNovelClient(config.novel_url, config.request_timeout_seconds)
             commenter = CommentGenerator(self.context, config)
@@ -37,13 +41,15 @@ class SFBooksTalkPlugin(Star):
             self._task = asyncio.create_task(self._runner.run_forever())
             logger.info("SFBooksTalk 插件已启动")
         except Exception as exc:
-            logger.exception(f"SFBooksTalk 插件初始化失败：{exc}")
+            logger.exception(
+                f"SFBooksTalk 插件初始化失败：{exc}；配置结构：{_describe_config_shape(raw_config)}"
+            )
 
     @filter.command("sfbookstalk_test_send")
     async def sfbookstalk_test_send(self, event: AstrMessageEvent):
         """立即抓取当前最新章节并强制发送一条【测试】通知。"""
         if self._runner is None:
-            yield event.plain_result("SFBooksTalk 还没有完成初始化，请稍后再试。")
+            yield event.plain_result("SFBooksTalk 还没有完成初始化，请先检查 novel_url 和插件日志。")
             return
         try:
             message = await self._runner.send_test_once()
@@ -64,3 +70,14 @@ class SFBooksTalkPlugin(Star):
             except asyncio.CancelledError:
                 pass
         logger.info("SFBooksTalk 插件已停止")
+
+
+def _describe_config_shape(raw_config: Any) -> str:
+    if raw_config is None:
+        return "None"
+    if isinstance(raw_config, Mapping):
+        return f"{type(raw_config).__name__}(keys={list(raw_config.keys())})"
+    keys = list(getattr(raw_config, "__dict__", {}).keys())
+    if keys:
+        return f"{type(raw_config).__name__}(attrs={keys})"
+    return type(raw_config).__name__
