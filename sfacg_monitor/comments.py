@@ -108,10 +108,12 @@ class CommentGenerator:
 def _normalize_mapping(data: Any) -> dict[str, Any]:
     if data is None:
         return {}
-    if hasattr(data, "model_dump"):
-        data = data.model_dump()
-    elif hasattr(data, "dict") and callable(data.dict):
-        data = data.dict()
+    model_dump = getattr(data, "model_dump", None)
+    data_dict = getattr(data, "dict", None)
+    if callable(model_dump):
+        data = model_dump()
+    elif callable(data_dict):
+        data = data_dict()
     elif not isinstance(data, Mapping) and hasattr(data, "__dict__"):
         data = vars(data)
 

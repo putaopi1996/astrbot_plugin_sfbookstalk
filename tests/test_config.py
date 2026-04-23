@@ -13,6 +13,20 @@ def test_from_mapping_accepts_direct_values():
     assert config.group_ids == ("123456",)
 
 
+def test_from_mapping_ignores_noncallable_model_dump_attribute():
+    class _AstrBotConfigLike:
+        model_dump = None
+
+        def __init__(self):
+            self.novel_url = "https://book.sfacg.com/Novel/747572/"
+            self.group_ids = ["123456"]
+
+    config = MonitorConfig.from_mapping(_AstrBotConfigLike())
+
+    assert config.novel_url == "https://book.sfacg.com/Novel/747572/"
+    assert config.group_ids == ("123456",)
+
+
 def test_from_sources_prefers_plugin_instance_config():
     config = MonitorConfig.from_sources(
         {
