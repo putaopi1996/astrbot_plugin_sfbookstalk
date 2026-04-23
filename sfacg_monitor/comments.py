@@ -61,7 +61,15 @@ class CommentGenerator:
                 chat_provider_id=self._resolve_chat_provider_id(),
                 prompt=prompt,
             )
-        return await llm_generate(prompt=prompt)
+        try:
+            return await llm_generate(prompt=prompt)
+        except TypeError as exc:
+            if "chat_provider_id" not in str(exc):
+                raise
+        return await llm_generate(
+            chat_provider_id=self._resolve_chat_provider_id(),
+            prompt=prompt,
+        )
 
     def _resolve_chat_provider_id(self) -> str:
         raw_config = {}

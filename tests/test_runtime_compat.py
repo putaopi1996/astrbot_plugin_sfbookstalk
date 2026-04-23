@@ -1,6 +1,11 @@
 import asyncio
 import sys
 import types
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from sfacg_monitor.comments import CommentGenerator
 from sfacg_monitor.config import MonitorConfig
@@ -46,7 +51,9 @@ sys.modules.setdefault("astrbot.api", astrbot_api_mod)
 sys.modules.setdefault("astrbot.api.event", astrbot_event_mod)
 sys.modules.setdefault("astrbot.api.star", astrbot_star_mod)
 
+import main as plugin_main
 from main import _send_test_once
+from sfacg_monitor import message_compat
 
 
 class _LegacyRunner:
@@ -105,6 +112,15 @@ class _ProviderContext:
         }
 
 
+class _OpaqueProviderContext(_ProviderContext):
+    async def _llm_generate_impl(self, *, chat_provider_id, prompt):
+        self.calls.append((chat_provider_id, prompt))
+        return _FakeResponse("点评完成")
+
+    async def llm_generate(self, **kwargs):
+        return await self._llm_generate_impl(**kwargs)
+
+
 def test_send_test_once_supports_legacy_runner():
     runner = _LegacyRunner()
     result = asyncio.run(_send_test_once(runner))
@@ -160,3 +176,47 @@ def test_comment_generator_supplies_default_provider_id():
     assert result == "点评完成"
     assert context.calls
     assert context.calls[0][0] == "default"
+
+
+def test_comment_generator_retries_with_provider_id_for_opaque_signature():
+    config = MonitorConfig.from_mapping(
+        {
+            "novel_url": "https://book.sfacg.com/Novel/747572/",
+            "enable_llm_comment": True,
+        }
+    )
+    context = _OpaqueProviderContext()
+    generator = CommentGenerator(context, config)
+    latest = NovelLatest(
+        novel_title="示例小说",
+        author="作者",
+        latest_chapter_title="第1章",
+        latest_chapter_url="https://book.sfacg.com/vip/c/1/",
+    )
+    chapter = ChapterDetail(
+        chapter_title="第1章",
+        chapter_url="https://book.sfacg.com/vip/c/1/",
+        update_time="2026-04-24 10:00:00",
+        word_count=1234,
+        preview="预览内容",
+    )
+
+    result = asyncio.run(generator.generate(latest, chapter))
+
+    assert result == "点评完成"
+    assert context.calls
+    assert context.calls[0][0] == "default"
+
+
+def test_send_test_once_handles_stale_message_builder(monkeypatch):
+    runner = _LegacyRunner()
+
+    def old_build_update_message(latest, chapter, comment, preview_max_chars):
+        return build_update_message(latest, chapter, comment, preview_max_chars)
+
+    monkeypatch.setattr(message_compat, "build_update_message", old_build_update_message)
+
+    result = asyncio.run(plugin_main._send_test_once(runner))
+
+    assert result.startswith("【测试】")
+    assert runner.sent_messages == [result]

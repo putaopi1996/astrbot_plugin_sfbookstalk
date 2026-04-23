@@ -15,7 +15,7 @@ from astrbot.api.star import Context, Star, register
 from sfacg_monitor.client import SfNovelClient
 from sfacg_monitor.comments import CommentGenerator
 from sfacg_monitor.config import MonitorConfig
-from sfacg_monitor.messages import build_update_message
+from sfacg_monitor.message_compat import render_update_message
 from sfacg_monitor.monitor import MonitorRunner
 from sfacg_monitor.sender import OneBotSender
 from sfacg_monitor.state import KvStateStore
@@ -131,7 +131,7 @@ async def _send_test_once(runner: Any) -> str:
     if hasattr(sender, "has_targets") and not sender.has_targets():
         raise RuntimeError("没有可发送的 QQ 群或 QQ 目标，请先配置 group_ids 或 private_user_ids")
     comment = await runner.commenter.generate(latest, chapter)
-    message = build_update_message(
+    message = render_update_message(
         latest,
         chapter,
         comment,

@@ -4,7 +4,7 @@ import asyncio
 
 from .config import MonitorConfig
 from .compat import logger
-from .messages import build_update_message
+from .message_compat import render_update_message
 
 
 class MonitorRunner:
@@ -34,7 +34,7 @@ class MonitorRunner:
         if hasattr(self.sender, "has_targets") and not self.sender.has_targets():
             raise RuntimeError("没有可发送的 QQ 群或 QQ 目标，请先配置 group_ids 或 private_user_ids")
         comment = await self.commenter.generate(latest, chapter)
-        message = build_update_message(
+        message = render_update_message(
             latest,
             chapter,
             comment,
