@@ -58,17 +58,14 @@ class SFBooksTalkPlugin(Star):
             yield event.plain_result("SFBooksTalk 还没有完成初始化，请先检查 novel_url 和插件日志。")
             return
         try:
-            messages = await _send_test_once(self._runner)
+            # Only trigger the actual notification flow here.
+            await _send_test_once(self._runner)
         except Exception as exc:
             logger.exception(f"SFBooksTalk 测试发送失败：{exc}")
             yield event.plain_result(f"测试发送失败：{exc}")
             return
         logger.info("SFBooksTalk 已完成一次手动测试发送")
-        for index, message in enumerate(messages):
-            if index == 0:
-                yield event.plain_result(f"测试发送完成，已按正式流程发送通知。\n\n{message}")
-            else:
-                yield event.plain_result(message)
+        return
 
     async def terminate(self):
         if self._runner:
