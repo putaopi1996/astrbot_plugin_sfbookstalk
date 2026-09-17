@@ -32,6 +32,7 @@ class MonitorConfig:
     preview_max_chars: int = 180
     request_timeout_seconds: int = 15
     enable_llm_comment: bool = True
+    llm_provider_id: str = ""
     comment_prompt: str = DEFAULT_COMMENT_PROMPT
     comment_fallback_text: str = DEFAULT_COMMENT_FALLBACK_TEXT
 
@@ -70,6 +71,7 @@ class MonitorConfig:
             preview_max_chars=preview_max_chars,
             request_timeout_seconds=timeout,
             enable_llm_comment=bool(_unwrap_field_value(data.get("enable_llm_comment", True))),
+            llm_provider_id=str(_unwrap_field_value(data.get("llm_provider_id")) or "").strip(),
             comment_prompt=str(_unwrap_field_value(data.get("comment_prompt")) or DEFAULT_COMMENT_PROMPT),
             comment_fallback_text=str(
                 _unwrap_field_value(data.get("comment_fallback_text")) or DEFAULT_COMMENT_FALLBACK_TEXT
@@ -141,6 +143,7 @@ def _looks_like_plugin_config(data: Mapping[str, Any]) -> bool:
             "preview_max_chars",
             "request_timeout_seconds",
             "enable_llm_comment",
+            "llm_provider_id",
             "comment_prompt",
             "comment_fallback_text",
         )

@@ -24,6 +24,7 @@
 - `notify_on_first_run`：首次运行是否发送当前最新章节
 - `preview_max_chars`：预览内容最大长度
 - `enable_llm_comment`：是否启用大模型点评
+- `llm_provider_id`：点评使用的大模型 provider（下拉选择）。留空时跟随 AstrBot 当前正在使用的 provider；调用失败会自动尝试其他已加载的 provider
 - `comment_prompt`：点评提示词模板
 - `comment_fallback_text`：大模型失败时的兜底点评
 
@@ -58,3 +59,9 @@
 `/sfbookstalk_test_send`
 
 它会忽略已通知记录，立刻抓取当前最新章节，并按正式流程向已配置的目标发送一条带 `` 前缀的测试通知。
+
+## 查看点评使用的大模型
+
+`/sfbookstalk_llm`
+
+显示插件指定的 provider、AstrBot 当前 provider、已加载的 provider 列表，以及点评实际的尝试顺序。更换供应商后如果点评失败，可以先用它排查。

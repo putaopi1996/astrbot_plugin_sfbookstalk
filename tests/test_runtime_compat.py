@@ -426,3 +426,99 @@ def test_load_runtime_components_reloads_messages_before_message_compat(monkeypa
 
     assert runtime.render_update_messages(None, None, "", 0) == ["header", "preview", "comment"]
     assert reload_order.index("sfacg_monitor.messages") < reload_order.index("sfacg_monitor.message_compat")
+
+
+class _FakeProvider:
+    def __init__(self, provider_id):
+        self._id = provider_id
+
+    def meta(self):
+        return types.SimpleNamespace(id=self._id)
+
+
+class _SwitchedProviderContext:
+    """模拟更换供应商后：配置文件里还是旧 id，运行时当前 provider 已是新 id。"""
+
+    def __init__(self, loaded=("new",), current="new", failing=()):
+        self.loaded = [_FakeProvider(provider_id) for provider_id in loaded]
+        self.current = current
+        self.failing = set(failing)
+        self.calls = []
+
+    async def llm_generate(self, *, chat_provider_id, prompt):
+        self.calls.append(chat_provider_id)
+        if chat_provider_id in self.failing:
+            raise RuntimeError(f"Provider {chat_provider_id} not found")
+        return _FakeResponse(f"点评来自{chat_provider_id}")
+
+    async def get_using_provider_async(self, umo=None):
+        return _FakeProvider(self.current) if self.current else None
+
+    def get_all_providers(self):
+        return self.loaded
+
+    def get_config(self):
+        return {
+            "provider_settings": {"default_provider_id": "old"},
+            "provider": [{"id": "old", "enable": True}],
+        }
+
+
+def _sample_update():
+    latest = NovelLatest(
+        novel_title="示例小说",
+        author="作者",
+        latest_chapter_title="第1章",
+        latest_chapter_url="https://book.sfacg.com/vip/c/1/",
+    )
+    chapter = ChapterDetail(
+        chapter_title="第1章",
+        chapter_url="https://book.sfacg.com/vip/c/1/",
+        update_time="2026-04-24 10:00:00",
+        word_count=1234,
+        preview="预览内容",
+    )
+    return latest, chapter
+
+
+def _config(**extra):
+    return MonitorConfig.from_mapping(
+        {"novel_url": "https://book.sfacg.com/Novel/747572/", "enable_llm_comment": True, **extra}
+    )
+
+
+def test_comment_generator_follows_switched_current_provider():
+    context = _SwitchedProviderContext(loaded=("new",), current="new")
+    result = asyncio.run(CommentGenerator(context, _config()).generate(*_sample_update()))
+
+    assert result == "点评来自new"
+    assert context.calls == ["new"]
+
+
+def test_comment_generator_prefers_configured_provider():
+    context = _SwitchedProviderContext(loaded=("a", "b"), current="a")
+    result = asyncio.run(
+        CommentGenerator(context, _config(llm_provider_id="b")).generate(*_sample_update())
+    )
+
+    assert result == "点评来自b"
+    assert context.calls == ["b"]
+
+
+def test_comment_generator_falls_back_to_next_loaded_provider():
+    context = _SwitchedProviderContext(loaded=("a", "b"), current="a", failing=("a",))
+    result = asyncio.run(CommentGenerator(context, _config()).generate(*_sample_update()))
+
+    assert result == "点评来自b"
+    assert context.calls == ["a", "b"]
+
+
+def test_comment_generator_skips_unloaded_configured_provider():
+    context = _SwitchedProviderContext(loaded=("new",), current="new")
+    generator = CommentGenerator(context, _config(llm_provider_id="removed"))
+    result = asyncio.run(generator.generate(*_sample_update()))
+
+    assert result == "点评来自new"
+    assert context.calls == ["new"]
+    description = asyncio.run(generator.describe_providers())
+    assert "removed 未加载" in description

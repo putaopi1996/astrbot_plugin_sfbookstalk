@@ -44,6 +44,7 @@ class SFBooksTalkPlugin(Star):
             self._runner = runtime.MonitorRunner(config, client, commenter, sender, state)
             self._task = asyncio.create_task(self._runner.run_forever())
             logger.info("SFBooksTalk 插件已启动")
+            await _log_provider_selection(commenter)
         except Exception as exc:
             logger.exception(
                 "SFBooksTalk 插件初始化失败："
@@ -67,6 +68,19 @@ class SFBooksTalkPlugin(Star):
         logger.info("SFBooksTalk 已完成一次手动测试发送")
         return
 
+    @filter.command("sfbookstalk_llm")
+    async def sfbookstalk_llm(self, event: AstrMessageEvent):
+        """查看点评当前会使用的大模型 provider。"""
+        if self._runner is None:
+            yield event.plain_result("SFBooksTalk 还没有完成初始化，请先检查 novel_url 和插件日志。")
+            return
+        try:
+            text = await self._runner.commenter.describe_providers()
+        except Exception as exc:
+            logger.exception(f"SFBooksTalk 查询 provider 失败：{exc}")
+            text = f"查询 provider 失败：{exc}"
+        yield event.plain_result(text)
+
     async def terminate(self):
         if self._runner:
             self._runner.stop()
@@ -77,6 +91,16 @@ class SFBooksTalkPlugin(Star):
             except asyncio.CancelledError:
                 pass
         logger.info("SFBooksTalk 插件已停止")
+
+
+async def _log_provider_selection(commenter: Any) -> None:
+    describe = getattr(commenter, "describe_providers", None)
+    if not callable(describe):
+        return
+    try:
+        logger.info("SFBooksTalk 点评模型：\n" + await describe())
+    except Exception as exc:
+        logger.warning(f"SFBooksTalk 读取点评模型信息失败：{exc!r}")
 
 
 def _describe_config_shape(raw_config: Any) -> str:
@@ -106,6 +130,7 @@ def _looks_like_plugin_config(raw_config: Any) -> bool:
             "preview_max_chars",
             "request_timeout_seconds",
             "enable_llm_comment",
+            "llm_provider_id",
             "comment_prompt",
             "comment_fallback_text",
         )

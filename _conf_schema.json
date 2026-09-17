@@ -39,6 +39,13 @@
     "type": "bool",
     "default": true
   },
+  "llm_provider_id": {
+    "description": "点评使用的大模型",
+    "type": "string",
+    "_special": "select_provider",
+    "hint": "点击后会列出 AstrBot 中已配置并启用的聊天模型，直接下拉选择即可。留空 = 跟随 AstrBot 当前正在使用的模型；所选模型调用失败时会自动尝试其他已加载的模型。保存后可发送 /sfbookstalk_llm 查看实际使用情况。",
+    "default": ""
+  },
   "comment_prompt": {
     "description": "点评提示词模板，可用变量：{novel_title} {author} {chapter_title} {update_time} {word_count} {preview} {chapter_url}",
     "type": "text",
